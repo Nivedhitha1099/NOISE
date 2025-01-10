@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Noise Analysis Results</title>
+    <style>
+        .container {
+            margin: 20px;
+            padding: 15px;
+        }
+        .fragment {
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .recommendation-item {
+            margin-left: 20px;
+            padding: 10px;
+            border-left: 3px solid #2c5282;
+        }
+        .structure-display {
+            font-family: monospace;
+            white-space: pre-wrap;
+            background-color: #edf2f7;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Noise Analysis Results</h1>
+        
+        {% for item in recommendations %}
+            <div class="fragment">
+                <h2>Fragment Details</h2>
+                <p><strong>ID:</strong> {{ item.fragment_id }}</p>
+                <p><strong>Element Type:</strong> {{ item.element_type }}</p>
+                
+                <h3>Fragment Structure:</h3>
+                <div class="structure-display">
+                    {{ item.fragment_structure | tojson(indent=2) }}
+                </div>
+                
+                <h3>Recommended Classes:</h3>
+                {% if item.recommendations %}
+                    {% for rec in item.recommendations %}
+                        <div class="recommendation-item">
+                            <p><strong>Class Name:</strong> {{ rec.class }}</p>
+                            <p><strong>Score:</strong> {{ rec.structure_score }}</p>
+                            <p><strong>Group:</strong> {{ rec.group_key }}</p>
+                            <h4>Matching Structure:</h4>
+                            <div class="structure-display">
+                                {{ rec.structure | tojson(indent=2) }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No recommendations found for this fragment.</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>
