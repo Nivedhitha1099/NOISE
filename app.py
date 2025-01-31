@@ -33,49 +33,65 @@ def calculate_similarity(fragment_structure, class_structure):
     
     return similarity
 
+def compare_patterns(pattern1, pattern2):
+    similarity_score = 0
+    for key in pattern1:
+        if key in pattern2:
+            if pattern1[key] == pattern2[key]:
+                similarity_score += 1
+    return similarity_score / len(pattern1)
+
 def get_recommendations(noise_fragments, clusters):
     recommendations = []
-    seen_classes = {} 
-    
+    seen_classes = {}
+
+    with open('pattern_final12.json') as f:
+        pattern_data = json.load(f)
+
     for fragment in noise_fragments:
         element_type = fragment.get('element_type')
         fragment_structure = {k: v for k, v in fragment.items() if k.startswith("Level_")}
         recommended_classes = []
 
         cluster_key = f'cluster_{element_type.lower()}'
-        
+
         if cluster_key in clusters:
             cluster_data = clusters[cluster_key]
-            
+
             if 'classes' in cluster_data:
                 for class_name, class_structure in cluster_data['classes'].items():
-                     
                     if class_name not in seen_classes:
                         level_structure = {k: v for k, v in class_structure.items() if k.startswith("Level_")}
                         similarity_score = calculate_similarity(fragment_structure, level_structure)
-                        
-                        
-                        first_fragment = next(iter(class_structure.get('fragments', [])), {})
-                        
+
                         recommended_classes.append({
                             'class': class_name,
-                            'structure': first_fragment,  
+                            'structure': level_structure,
                             'structure_score': similarity_score,
                             'group_key': cluster_key
                         })
                         seen_classes[class_name] = True
 
-        recommended_classes.sort(key=lambda x: x['structure_score'], reverse=True)
-        
-        recommendations.append({
-            'fragment_id': fragment.get('fragment_id'),
-            'element_type': element_type,
-            'fragment_structure': fragment_structure,
-            'recommendations': recommended_classes
-        })
+        # If no recommendations are found, take the same element type from the pattern file
+            if not recommended_classes:
+              similar_pattern = None
+              max_similarity = 0
+              for pattern in pattern_data:
+                 similarity = compare_patterns(fragment_structure, pattern)
+                 if similarity > max_similarity:
+                      max_similarity = similarity
+                      similar_pattern = pattern
+              if similar_pattern:
+                      recommended_classes.append({
+                'class': similar_pattern['class'],
+                'structure': similar_pattern['structure'],
+                'structure_score': max_similarity,
+                'group_key': cluster_key
+            })
+    
+    return recommended_classes
 
-    return recommendations
-
+    
 
 @app.route('/')
 def index():
@@ -112,6 +128,17 @@ def upload_json():
 
         recommendations = get_recommendations(noise_fragments, clusters)
 
+        # Wrap noise fragments and recommendations in a new "noises" key
+        updated_data = {
+            'noises': [
+                {
+                    'noise': fragment,
+                    'recommendations': recommendations
+                }
+                for fragment in noise_fragments
+            ]
+        }
+
         
         output_folder = 'output'
         os.makedirs(output_folder, exist_ok=True)
@@ -123,10 +150,7 @@ def upload_json():
 
         
         with open(output_path, 'w') as f:
-            json.dump({
-                'noise_fragments': noise_fragments,
-                'recommendations': recommendations
-            }, f, indent=2)
+            json.dump(updated_data, f, indent=2)
 
         return jsonify({
             'message': 'Recommendations generated successfully',
